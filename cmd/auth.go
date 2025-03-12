@@ -1,9 +1,7 @@
 package cmd
 
 import (
-	"bytes"
 	"encoding/json"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -75,17 +73,20 @@ func GetAuthToken(authCode string) AuthRes {
 		log.Fatal(err)
 	}
 
-	log.Println(authRes.Scope)
-
 	return authRes
 }
 
 func IsAuthTokenValid(authToken string) bool {
-	endpoint := "https://id.twitch.tv/oauth2/validate"
-	req, err := http.NewRequest("GET", endpoint, nil)
+	baseUrl := &url.URL{
+		Scheme: "https",
+		Host:   "id.twitch.tv",
+		Path:   "oauth2/validate",
+	}
+
+	req, err := http.NewRequest("GET", baseUrl.String(), nil)
 
 	if err != nil {
-		log.Fatalf("Error creating request: %v\n", err)
+		log.Fatal(err)
 	}
 
 	req.Header.Set("Authorization", "OAuth "+authToken)
@@ -94,7 +95,7 @@ func IsAuthTokenValid(authToken string) bool {
 	resp, err := client.Do(req)
 
 	if err != nil {
-		log.Fatalf("Error sending request: %v\n", err)
+		log.Fatal(err)
 	}
 
 	defer resp.Body.Close()
@@ -105,99 +106,102 @@ func IsAuthTokenValid(authToken string) bool {
 func RevokeAuthToken(authToken string) {
 	config := readConfig()
 
+	baseUrl := &url.URL{
+		Scheme: "https",
+		Host:   "id.twitch.tv",
+		Path:   "oauth2/revoke",
+	}
+
 	data := url.Values{}
-	data.Set("client_id", config.ClientId)
-	data.Set("token", authToken)
+	data.Add("client_id", config.ClientId)
+	data.Add("token", authToken)
 
-	endpoint := "https://id.twitch.tv/oauth2/revoke"
-	req, err := http.NewRequest("POST", endpoint, bytes.NewBufferString(data.Encode()))
-
-	if err != nil {
-		log.Fatalf("Error creating request: %v\n", err)
-	}
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	res, err := http.PostForm(baseUrl.String(), data)
 
 	if err != nil {
-		log.Fatalf("Error sending request: %v\n", err)
+		log.Fatal(err)
 	}
 
-	defer resp.Body.Close()
+	defer res.Body.Close()
 }
 
 func RefreshAuthToken(authToken, refreshToken string) AuthRes {
 	config := readConfig()
 
+	baseUrl := &url.URL{
+		Scheme: "https",
+		Host:   "id.twitch.tv",
+		Path:   "oauth2/token",
+	}
+
 	data := url.Values{}
-	data.Set("grant_type", "refresh_token")
-	data.Set("refresh_token", refreshToken)
-	data.Set("client_id", config.ClientId)
-	data.Set("client_secret", config.ClientSecret)
+	data.Add("grant_type", "refresh_token")
+	data.Add("refresh_token", refreshToken)
+	data.Add("client_id", config.ClientId)
+	data.Add("client_secret", config.ClientSecret)
 
-	endpoint := "https://id.twitch.tv/oauth2/token"
-	req, err := http.NewRequest("POST", endpoint, bytes.NewBufferString(data.Encode()))
-
-	if err != nil {
-		log.Fatalf("Error creating request: %v\n", err)
-	}
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	res, err := http.PostForm(baseUrl.String(), data)
 
 	if err != nil {
-		log.Fatalf("Error sending request: %v\n", err)
+		log.Fatal(err)
 	}
 
-	defer resp.Body.Close()
+	defer res.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	var authRes AuthRes
+
+	err = json.NewDecoder(res.Body).Decode(&authRes)
 
 	if err != nil {
-		log.Fatalf("Error reading response body: %v", err)
+		log.Fatal(err)
 	}
 
-	var authResponse AuthRes
-
-	if err := json.Unmarshal(body, &authResponse); err != nil {
-		log.Fatalf("Error parsing JSON: %v", err)
-	}
-
-	return authResponse
+	return authRes
 }
 
-// TODO: Return broadcaste user id
-func GetBroadcasterUserId(userName, authToken string) {
+type UserRes struct {
+	Data []struct {
+		Id string `json:"id"`
+	} `json:"data"`
+}
+
+func GetUser(userName, authToken string) UserRes {
 	config := readConfig()
 
-	endpoint := "https://api.twitch.tv/helix/users?login=" + userName
-	req, err := http.NewRequest("GET", endpoint, nil)
+	baseUrl := &url.URL{
+		Scheme: "https",
+		Host:   "api.twitch.tv",
+		Path:   "helix/users",
+	}
+
+	params := url.Values{}
+	params.Add("login", userName)
+
+	req, err := http.NewRequest("GET", baseUrl.String(), nil)
 
 	if err != nil {
-		log.Fatalf("Error creating request: %v\n", err)
+		log.Fatal(err)
 	}
 
 	req.Header.Set("Client-ID", config.ClientId)
 	req.Header.Set("Authorization", "Bearer "+authToken)
 
 	client := &http.Client{}
-	resp, err := client.Do(req)
+	res, err := client.Do(req)
 
 	if err != nil {
-		log.Fatalf("Error sending request: %v\n", err)
+		log.Fatal(err)
 	}
 
-	defer resp.Body.Close()
+	defer res.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	var userRes UserRes
+
+	err = json.NewDecoder(res.Body).Decode(&userRes)
 
 	if err != nil {
-		log.Fatalf("Error reading response body: %v", err)
+		log.Fatal(err)
 	}
 
-	log.Println(string(body))
+	return userRes
 }
