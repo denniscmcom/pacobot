@@ -1,35 +1,44 @@
 package main
 
 import (
+	"log"
 	"net/http"
 
-	"github.com/denniscmcom/pacobot/cmd"
+	"github.com/denniscmcom/pacobot/auth"
+	"github.com/denniscmcom/pacobot/bot"
+	"github.com/denniscmcom/pacobot/socket"
 	"github.com/gin-gonic/gin"
 )
 
+type PageData struct {
+	Title string
+}
+
 func main() {
 	gin.SetMode(gin.DebugMode)
-	r := gin.Default()
 
-	var authRes cmd.AuthRes
+	r := gin.Default()
+	r.LoadHTMLGlob("./www/*.html")
+
+	var authRes auth.AuthRes
 
 	r.GET("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Hello world",
+		c.HTML(http.StatusOK, "index.html", gin.H{
+			"Title": "Index",
 		})
 	})
 
-	// TODO: Pass username in parameters
-	r.GET("/id", func(c *gin.Context) {
-		cmd.GetBroadcasterUserId("denniscmartin", authRes.AccessToken)
+	r.GET("/user", func(c *gin.Context) {
+		userName := c.Query("username")
+		user := auth.GetUser(userName, authRes.AccessToken)
 
 		c.JSON(http.StatusOK, gin.H{
-			"message": "ok",
+			"message": user.Data[len(user.Data)-1].Id,
 		})
 	})
 
 	r.GET("/auth", func(c *gin.Context) {
-		authUrl := cmd.GetAuthUrl()
+		authUrl := auth.GetAuthUrl()
 
 		c.Redirect(http.StatusMovedPermanently, authUrl)
 	})
@@ -37,7 +46,7 @@ func main() {
 	r.GET("/auth-validate", func(c *gin.Context) {
 		msg := "failed"
 
-		if cmd.IsAuthTokenValid(authRes.AccessToken) {
+		if auth.IsAuthTokenValid(authRes.AccessToken) {
 			msg = "ok"
 		}
 
@@ -47,7 +56,7 @@ func main() {
 	})
 
 	r.GET("/auth-refresh", func(c *gin.Context) {
-		authRes = cmd.RefreshAuthToken(authRes.AccessToken, authRes.RefreshToken)
+		authRes = auth.RefreshAuthToken(authRes.AccessToken, authRes.RefreshToken)
 
 		c.JSON(http.StatusOK, gin.H{
 			"message": "ok",
@@ -55,7 +64,7 @@ func main() {
 	})
 
 	r.GET("/auth-revoke", func(c *gin.Context) {
-		cmd.RevokeAuthToken(authRes.AccessToken)
+		auth.RevokeAuthToken(authRes.AccessToken)
 
 		c.JSON(http.StatusOK, gin.H{
 			"message": "ok",
@@ -64,19 +73,24 @@ func main() {
 
 	r.GET("/twitch-auth-code-callback", func(c *gin.Context) {
 		authCode := c.Query("code")
-		authRes = cmd.GetAuthToken(authCode)
+		authRes = auth.GetAuthToken(authCode)
 
-		c.JSON(http.StatusOK, gin.H{
-			"message": "ok",
-		})
+		c.Redirect(http.StatusMovedPermanently, "/")
 	})
 
 	r.GET("/connect", func(c *gin.Context) {
-		go cmd.ConnSocket(authRes.AccessToken)
+		go socket.Connect(authRes.AccessToken)
 
-		c.JSON(http.StatusOK, gin.H{
-			"message": "ok",
-		})
+		c.Redirect(http.StatusMovedPermanently, "/")
+	})
+
+	r.POST("/timer", func(c *gin.Context) {
+		form := c.Request.PostForm
+		log.Println(form)
+		timesec := form.Get("tiempo-oculto")
+		log.Println(timesec)
+		args := []string{"timer", timesec}
+		bot.HandleCmd(args)
 	})
 
 	r.Run()
