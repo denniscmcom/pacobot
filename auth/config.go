@@ -1,4 +1,4 @@
-package cmd
+package auth
 
 import (
 	"encoding/json"
@@ -7,13 +7,7 @@ import (
 	"os"
 )
 
-type Config struct {
-	ClientId          string `json:"client_id"`
-	ClientSecret      string `json:"client_secret"`
-	BroadcasterUserId string `json:"broadcaster_user_id"`
-}
-
-func readConfig() Config {
+func ReadConfig() Config {
 	file, err := os.Open(".config.json")
 
 	if err != nil {

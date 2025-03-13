@@ -1,28 +1,19 @@
-package cmd
+package event
 
 import (
 	"bytes"
 	"encoding/json"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
+
+	"github.com/denniscmcom/pacobot/auth"
 )
 
-type ChannelChatMsgSubPayload struct {
-	Payload struct {
-		Event struct {
-			Msg struct {
-				Text string `json:"text"`
-			} `json:"message"`
-		} `json:"event"`
-	} `json:"payload"`
-}
-
 func ChannelChatMsgSub(authToken, session_id string) {
-	config := readConfig()
+	config := auth.ReadConfig()
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"type":    "channel.chat.message",
 		"version": "1",
 		"condition": map[string]string{
@@ -41,6 +32,7 @@ func ChannelChatMsgSub(authToken, session_id string) {
 		log.Fatal(err)
 	}
 
+	log.Printf("event: subscribing to %s", data["type"])
 	eventSub(authToken, jsonData)
 }
 
@@ -57,7 +49,7 @@ func eventSub(authToken string, subData []byte) {
 		log.Fatal(err)
 	}
 
-	config := readConfig()
+	config := auth.ReadConfig()
 
 	req.Header.Set("Authorization", "Bearer "+authToken)
 	req.Header.Set("Client-Id", config.ClientId)
@@ -70,13 +62,13 @@ func eventSub(authToken string, subData []byte) {
 		log.Fatal(err)
 	}
 
-	defer res.Body.Close()
+	log.Printf("status code: %d", res.StatusCode)
 
-	body, err := io.ReadAll(res.Body)
-
-	if err != nil {
-		log.Fatal(err)
+	if res.StatusCode != 202 {
+		log.Fatal("event: failed to subscribe to event")
 	}
 
-	log.Println(string(body))
+	log.Println("event: subscribed")
+
+	defer res.Body.Close()
 }

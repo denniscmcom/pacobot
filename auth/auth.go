@@ -1,4 +1,4 @@
-package cmd
+package auth
 
 import (
 	"encoding/json"
@@ -10,7 +10,7 @@ import (
 // TODO: Change unmarshall to JSON DECODE
 
 func GetAuthUrl() string {
-	config := readConfig()
+	config := ReadConfig()
 
 	baseUrl := &url.URL{
 		Scheme: "https",
@@ -31,14 +31,8 @@ func GetAuthUrl() string {
 	return baseUrl.String()
 }
 
-type AuthRes struct {
-	AccessToken  string   `json:"access_token"`
-	RefreshToken string   `json:"refresh_token"`
-	Scope        []string `json:"scope"`
-}
-
 func GetAuthToken(authCode string) AuthRes {
-	config := readConfig()
+	config := ReadConfig()
 
 	baseUrl := &url.URL{
 		Scheme: "https",
@@ -104,7 +98,7 @@ func IsAuthTokenValid(authToken string) bool {
 }
 
 func RevokeAuthToken(authToken string) {
-	config := readConfig()
+	config := ReadConfig()
 
 	baseUrl := &url.URL{
 		Scheme: "https",
@@ -126,7 +120,7 @@ func RevokeAuthToken(authToken string) {
 }
 
 func RefreshAuthToken(authToken, refreshToken string) AuthRes {
-	config := readConfig()
+	config := ReadConfig()
 
 	baseUrl := &url.URL{
 		Scheme: "https",
@@ -159,14 +153,8 @@ func RefreshAuthToken(authToken, refreshToken string) AuthRes {
 	return authRes
 }
 
-type UserRes struct {
-	Data []struct {
-		Id string `json:"id"`
-	} `json:"data"`
-}
-
 func GetUser(userName, authToken string) UserRes {
-	config := readConfig()
+	config := ReadConfig()
 
 	baseUrl := &url.URL{
 		Scheme: "https",
