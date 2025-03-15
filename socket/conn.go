@@ -117,7 +117,9 @@ func readMsg(done chan struct{}, conn *websocket.Conn, timeout *time.Ticker, aut
 				chatMsg := resNotifChannelChatMsg.Payload.Event.Msg.Text
 
 				if strings.HasPrefix(chatMsg, "!") {
-					go bot.HandleCmd(strings.Split(chatMsg[1:], " "))
+					if resNotifChannelChatMsg.Payload.Event.ChatterUserName == "denniscmartin" {
+						go bot.HandleCmd(strings.Split(chatMsg[1:], " "))
+					}
 				}
 			}
 		default:
