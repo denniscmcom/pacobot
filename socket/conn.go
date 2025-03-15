@@ -2,7 +2,6 @@ package socket
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/url"
 	"os"
@@ -33,7 +32,7 @@ func Connect(authToken string) {
 	log.Println("socket: connected")
 
 	var timeout time.Ticker
-	done := make(chan bool)
+	done := make(chan struct{})
 
 	go readMsg(done, conn, &timeout, authToken)
 
@@ -58,7 +57,8 @@ func Connect(authToken string) {
 	}
 }
 
-func readMsg(done chan bool, conn *websocket.Conn, timeout *time.Ticker, authToken string) {
+func readMsg(done chan struct{}, conn *websocket.Conn, timeout *time.Ticker, authToken string) {
+	defer close(done)
 	var timeout_secs time.Duration
 
 	for {
@@ -114,29 +114,16 @@ func readMsg(done chan bool, conn *websocket.Conn, timeout *time.Ticker, authTok
 					log.Fatal(err)
 				}
 
-				// TODO: Add to a function
-				jsonFormatted, err := json.MarshalIndent(resNotifChannelChatMsg, "", " ")
-
-				if err != nil {
-					log.Fatalf("socket: error al formatear")
-				}
-
-				// log.Println(resNotifChannelChatMsg.Payload.Event)
-				fmt.Print(string(jsonFormatted))
-
 				chatMsg := resNotifChannelChatMsg.Payload.Event.Msg.Text
-				log.Println(chatMsg)
 
 				if strings.HasPrefix(chatMsg, "!") {
-					bot.HandleCmd(strings.Split(chatMsg[1:], " "))
+					go bot.HandleCmd(strings.Split(chatMsg[1:], " "))
 				}
 			}
 		default:
-			log.Fatalf("%s: message type not implemented", msgType)
+			log.Fatalf("socket: %s message type not implemented", msgType)
 		}
 	}
-
-	done <- true
 }
 
 func closeConn(conn *websocket.Conn) {
